@@ -283,29 +283,25 @@
     </div>
   </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   "use strict";
 
-  var STORAGE_KEY = "notafiscal_log_v1";
+  var firebaseConfig = {
+    apiKey: "AIzaSyAxmOEi5dOhQ74rxpR_s_kx_RIyMekavgw",
+    authDomain: "mrq-log-nfs-e.firebaseapp.com",
+    projectId: "mrq-log-nfs-e",
+    storageBucket: "mrq-log-nfs-e.firebasestorage.app",
+    messagingSenderId: "605510507211",
+    appId: "1:605510507211:web:0f22add297f40ae483994e"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.firestore();
+  var notasRef = db.collection("notas");
+
   var notas = [];
-
-  function loadData(){
-    try{
-      var raw = localStorage.getItem(STORAGE_KEY);
-      notas = raw ? JSON.parse(raw) : [];
-    }catch(e){
-      notas = [];
-    }
-  }
-
-  function saveData(){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notas));
-    }catch(e){
-      alert("Não foi possível salvar os dados neste navegador.");
-    }
-  }
 
   function uid(){
     return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
@@ -509,9 +505,10 @@
     Promise.all(promises).then(function(results){
       var okCount = 0;
       var failCount = 0;
+      var batch = db.batch();
       results.forEach(function(r){
         if(!r.fields){ failCount++; return; }
-        notas.unshift({
+        var record = {
           id: uid(),
           numero: r.fields.numero || "",
           cliente: r.fields.cliente || "",
@@ -523,13 +520,16 @@
           descricaoServico: r.fields.descricaoServico || "",
           status: "emitida",
           obs: "Importado de " + r.file.name
-        });
+        };
+        batch.set(notasRef.doc(record.id), record);
         okCount++;
       });
-      saveData();
-      render();
-      xmlStatus.textContent = okCount + " nota(s) importada(s)" + (failCount ? ", " + failCount + " arquivo(s) não reconhecido(s)" : "") + ". Revise os dados na lista abaixo.";
-      window.scrollTo({top: 0, behavior:"smooth"});
+      batch.commit().then(function(){
+        xmlStatus.textContent = okCount + " nota(s) importada(s)" + (failCount ? ", " + failCount + " arquivo(s) não reconhecido(s)" : "") + ". Revise os dados na lista abaixo.";
+        window.scrollTo({top: 0, behavior:"smooth"});
+      }).catch(function(err){
+        xmlStatus.textContent = "Erro ao salvar no banco de dados: " + err.message;
+      });
     });
   });
 
@@ -564,9 +564,9 @@
 
   function deleteNota(id){
     if(!confirm("Excluir esta nota fiscal?")) return;
-    notas = notas.filter(function(x){return x.id !== id;});
-    saveData();
-    render();
+    notasRef.doc(id).delete().catch(function(err){
+      alert("Não foi possível excluir: " + err.message);
+    });
   }
 
   form.addEventListener("submit", function(e){
@@ -586,16 +586,11 @@
       obs: obsField.value.trim()
     };
 
-    if(id){
-      var idx = notas.findIndex(function(x){return x.id === id;});
-      if(idx !== -1) notas[idx] = record;
-    } else {
-      notas.unshift(record);
-    }
-
-    saveData();
-    resetForm();
-    render();
+    notasRef.doc(record.id).set(record).then(function(){
+      resetForm();
+    }).catch(function(err){
+      alert("Não foi possível salvar: " + err.message);
+    });
   });
 
   cancelEditBtn.addEventListener("click", resetForm);
@@ -751,13 +746,22 @@
   clearBtn.addEventListener("click", function(){
     if(notas.length === 0) return;
     if(!confirm("Isso vai apagar TODAS as notas cadastradas. Tem certeza?")) return;
-    notas = [];
-    saveData();
-    render();
+    notasRef.get().then(function(snapshot){
+      var batch = db.batch();
+      snapshot.forEach(function(doc){ batch.delete(doc.ref); });
+      return batch.commit();
+    }).catch(function(err){
+      alert("Não foi possível apagar tudo: " + err.message);
+    });
   });
 
-  loadData();
-  render();
+  notasRef.onSnapshot(function(snapshot){
+    notas = snapshot.docs.map(function(doc){ return doc.data(); });
+    notas.sort(function(a,b){ return (b.dataEmissao || "").localeCompare(a.dataEmissao || ""); });
+    render();
+  }, function(err){
+    xmlStatus.textContent = "Erro ao conectar com o banco de dados: " + err.message;
+  });
 })();
 </script>
 </body>
