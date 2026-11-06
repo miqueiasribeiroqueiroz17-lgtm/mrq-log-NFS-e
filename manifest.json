@@ -1,0 +1,24 @@
+{
+  "name": "MRQ Log",
+  "short_name": "MRQ Log",
+  "description": "Controle das notas fiscais de serviço (NFS-e) emitidas",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1930",
+  "theme_color": "#0b1930",
+  "icons": [
+    {
+      "src": "1cdcfd459b9bcea4dc93296221a389b9.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "1cdcfd459b9bcea4dc93296221a389b9.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
