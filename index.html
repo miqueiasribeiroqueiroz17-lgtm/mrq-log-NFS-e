@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MRQ Log</title>
+<style>
+  :root{
+    --bg:#0b1930;
+    --panel:#13264a;
+    --panel2:#1a3159;
+    --border:#2a4571;
+    --text:#f3f5f8;
+    --muted:#9fb0cc;
+    --accent:#22c55e;
+    --accent2:#f7941e;
+    --accent2-dark:#f15a24;
+    --warn:#ffc107;
+    --danger:#ef4444;
+    --navy:#0d2149;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:20px;
+    max-width:1100px;
+    margin:0 auto;
+  }
+  h1{font-size:22px;margin:0 0 4px 0;}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px;}
+
+  .brandbar{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:var(--navy);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:14px 18px;
+    margin-bottom:20px;
+  }
+  .brandbar img{
+    height:48px;
+    width:48px;
+    border-radius:10px;
+    flex-shrink:0;
+  }
+  .brandbar .brand-text h1{margin:0;font-size:19px;}
+  .brandbar .brand-text .sub{margin:2px 0 0 0;}
+
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px;
+    margin-bottom:20px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .card .label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .card .value{font-size:20px;font-weight:600;}
+  .card.green .value{color:var(--accent);}
+  .card.blue .value{color:var(--accent2);}
+  .card.orange .value{color:var(--warn);}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:20px;
+  }
+  .panel h2{font-size:15px;margin:0 0 12px 0;}
+
+  form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  label{font-size:12px;color:var(--muted);}
+  input,select{
+    background:var(--panel2);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+    color:var(--text);
+    font-size:14px;
+  }
+  input:focus,select:focus{outline:1px solid var(--accent2);}
+  button{
+    background:var(--accent2);
+    border:none;
+    border-radius:8px;
+    padding:9px 14px;
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  button:hover{opacity:.9;}
+  button.secondary{background:var(--panel2);border:1px solid var(--border);color:var(--text);}
+  button.danger{background:var(--danger);}
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 9px;font-size:12px;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .toolbar input, .toolbar select{min-width:140px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+  .badge{
+    display:inline-block;
+    padding:3px 9px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:600;
+  }
+  .badge.paga{background:rgba(34,197,94,.15);color:var(--accent);}
+  .badge.emitida{background:rgba(247,148,30,.18);color:var(--accent2);}
+  .badge.atrasada{background:rgba(239,68,68,.15);color:var(--danger);}
+  .badge.cancelada{background:rgba(154,163,178,.15);color:var(--muted);}
+
+  .actions{display:flex;gap:6px;}
+  .empty{color:var(--muted);text-align:center;padding:30px 0;font-size:13px;}
+
+  .footer-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:10px;}
+
+  @media (max-width:480px){
+    body{padding:14px;}
+    table{font-size:12px;}
+    th:nth-child(1),td:nth-child(1){display:none;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="brandbar">
+    <img src="1cdcfd459b9bcea4dc93296221a389b9.png" alt="Logo MRQ Log" />
+    <div class="brand-text">
+      <h1>MRQ Log</h1>
+      <div class="sub">Controle das notas fiscais de serviço (NFS-e) emitidas</div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card blue">
+      <div class="label">Total emitido (mês atual)</div>
+      <div class="value" id="statMesTotal">R$ 0,00</div>
+    </div>
+    <div class="card green">
+      <div class="label">Recebido (mês atual)</div>
+      <div class="value" id="statMesPago">R$ 0,00</div>
+    </div>
+    <div class="card orange">
+      <div class="label">A receber</div>
+      <div class="value" id="statAberto">R$ 0,00</div>
+    </div>
+    <div class="card">
+      <div class="label">Notas cadastradas</div>
+      <div class="value" id="statCount">0</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Importar XML da NFS-e</h2>
+    <div class="sub" style="margin-bottom:10px;">Anexe o XML da nota e os campos abaixo são preenchidos automaticamente. Confira os valores antes de salvar — o layout varia por prefeitura e a extração pode não pegar tudo certo.</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="file" id="xmlInput" accept=".xml,text/xml" multiple />
+      <span class="sub" id="xmlStatus"></span>
+    </div>
+    <div class="sub" style="margin-top:8px;">Pode selecionar vários arquivos XML de uma vez: anexando mais de um, cada nota é cadastrada direto na lista (status "Emitida") — depois é só revisar e ajustar o que precisar.</div>
+  </div>
+
+  <div class="panel">
+    <h2 id="formTitle">Nova nota fiscal</h2>
+    <form id="nfForm">
+      <input type="hidden" id="editId" />
+      <div class="field">
+        <label>Número da NF</label>
+        <input type="text" id="numero" placeholder="Ex: 1024" required />
+      </div>
+      <div class="field">
+        <label>Cliente</label>
+        <input type="text" id="cliente" placeholder="Nome do cliente" required />
+      </div>
+      <div class="field">
+        <label>Data de emissão</label>
+        <input type="date" id="dataEmissao" required />
+      </div>
+      <div class="field">
+        <label>Vencimento</label>
+        <input type="date" id="dataVencimento" />
+      </div>
+      <div class="field">
+        <label>Valor bruto (R$)</label>
+        <input type="number" id="valor" step="0.01" min="0" placeholder="0,00" required />
+      </div>
+      <div class="field">
+        <label>ISS retido?</label>
+        <select id="issRetido">
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>ISS (%)</label>
+        <input type="number" id="issPercentual" step="0.01" min="0" placeholder="Ex: 5" />
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="status">
+          <option value="emitida">Emitida</option>
+          <option value="paga">Paga</option>
+          <option value="atrasada">Atrasada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+      </div>
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Descrição do serviço prestado</label>
+        <input type="text" id="descricaoServico" placeholder="Ex: Consultoria em TI - novembro/2026" required />
+      </div>
+      <div class="field">
+        <label>Observações</label>
+        <input type="text" id="obs" placeholder="opcional" />
+      </div>
+      <div class="field">
+        <button type="submit" id="submitBtn">Adicionar</button>
+      </div>
+      <div class="field">
+        <button type="button" class="secondary" id="cancelEditBtn" style="display:none;">Cancelar edição</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Notas lançadas</h2>
+    <div class="toolbar">
+      <input type="text" id="searchBox" placeholder="Buscar por cliente ou número..." />
+      <select id="filterStatus">
+        <option value="">Todos os status</option>
+        <option value="emitida">Emitida</option>
+        <option value="paga">Paga</option>
+        <option value="atrasada">Atrasada</option>
+        <option value="cancelada">Cancelada</option>
+      </select>
+      <input type="month" id="filterMonth" />
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Nº</th>
+            <th>Cliente</th>
+            <th>Serviço</th>
+            <th>Emissão</th>
+            <th>Vencimento</th>
+            <th>Bruto</th>
+            <th>ISS</th>
+            <th>Líquido</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="emptyMsg" style="display:none;">Nenhuma nota cadastrada ainda.</div>
+    </div>
+
+    <div class="footer-actions">
+      <div class="sub" id="filteredSummary"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="secondary" id="exportBtn">Exportar CSV</button>
+        <button type="button" class="danger" id="clearBtn">Limpar tudo</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "notafiscal_log_v1";
+  var notas = [];
+
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      notas = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      notas = [];
+    }
+  }
+
+  function saveData(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notas));
+    }catch(e){
+      alert("Não foi possível salvar os dados neste navegador.");
+    }
+  }
+
+  function uid(){
+    return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+  }
+
+  function calcISSValor(valor, percentual){
+    return (Number(valor) || 0) * (Number(percentual) || 0) / 100;
+  }
+
+  function calcLiquido(n){
+    var issValor = calcISSValor(n.valor, n.issPercentual);
+    return n.issRetido === "sim" ? n.valor - issValor : n.valor;
+  }
+
+  function formatBRL(v){
+    var n = Number(v) || 0;
+    return n.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+  }
+
+  function formatDateDisplay(iso){
+    if(!iso) return "-";
+    var parts = iso.split("-");
+    if(parts.length !== 3) return iso;
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function todayISO(){
+    var d = new Date();
+    return d.toISOString().slice(0,10);
+  }
+
+  function currentMonthKey(){
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+  }
+
+  // ---- Elements ----
+  var form = document.getElementById("nfForm");
+  var editIdField = document.getElementById("editId");
+  var numeroField = document.getElementById("numero");
+  var clienteField = document.getElementById("cliente");
+  var dataEmissaoField = document.getElementById("dataEmissao");
+  var dataVencimentoField = document.getElementById("dataVencimento");
+  var valorField = document.getElementById("valor");
+  var issRetidoField = document.getElementById("issRetido");
+  var issPercentualField = document.getElementById("issPercentual");
+  var descricaoServicoField = document.getElementById("descricaoServico");
+  var statusField = document.getElementById("status");
+  var obsField = document.getElementById("obs");
+  var submitBtn = document.getElementById("submitBtn");
+  var cancelEditBtn = document.getElementById("cancelEditBtn");
+  var formTitle = document.getElementById("formTitle");
+
+  var tbody = document.getElementById("tbody");
+  var emptyMsg = document.getElementById("emptyMsg");
+  var searchBox = document.getElementById("searchBox");
+  var filterStatus = document.getElementById("filterStatus");
+  var filterMonth = document.getElementById("filterMonth");
+  var filteredSummary = document.getElementById("filteredSummary");
+
+  var statMesTotal = document.getElementById("statMesTotal");
+  var statMesPago = document.getElementById("statMesPago");
+  var statAberto = document.getElementById("statAberto");
+  var statCount = document.getElementById("statCount");
+
+  var exportBtn = document.getElementById("exportBtn");
+  var clearBtn = document.getElementById("clearBtn");
+
+  dataEmissaoField.value = todayISO();
+
+  // ---- Importar XML da NFS-e ----
+  var xmlInput = document.getElementById("xmlInput");
+  var xmlStatus = document.getElementById("xmlStatus");
+
+  // Mapa localName (minúsculo) -> texto, pegando o primeiro valor de cada tag encontrada no XML.
+  function buildTagMap(xmlDoc){
+    var map = {};
+    var all = xmlDoc.getElementsByTagName("*");
+    for(var i=0;i<all.length;i++){
+      var el = all[i];
+      var name = (el.localName || el.tagName || "").toLowerCase();
+      if(!name) continue;
+      // Só guarda texto de elementos "folha" (sem filhos elemento), pra não pegar o XML inteiro concatenado
+      var hasChildEl = false;
+      for(var j=0;j<el.childNodes.length;j++){
+        if(el.childNodes[j].nodeType === 1){ hasChildEl = true; break; }
+      }
+      if(hasChildEl) continue;
+      var text = (el.textContent || "").trim();
+      if(!text) continue;
+      if(map[name] === undefined) map[name] = text;
+    }
+    return map;
+  }
+
+  function firstOf(map, candidates){
+    for(var i=0;i<candidates.length;i++){
+      var v = map[candidates[i].toLowerCase()];
+      if(v !== undefined && v !== "") return v;
+    }
+    return "";
+  }
+
+  function toDateInputValue(raw){
+    if(!raw) return "";
+    var m = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return m[1] + "-" + m[2] + "-" + m[3];
+    m = raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m) return m[3] + "-" + m[2] + "-" + m[1];
+    return "";
+  }
+
+  function toNumber(raw){
+    if(!raw) return "";
+    var n = parseFloat(String(raw).replace(",", "."));
+    return isNaN(n) ? "" : n;
+  }
+
+  function readFileAsText(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(e){ resolve(e.target.result); };
+      reader.onerror = function(){ reject(new Error("read error")); };
+      reader.readAsText(file);
+    });
+  }
+
+  function extractFieldsFromXmlText(text){
+    var parser = new DOMParser();
+    var xmlDoc = parser.parseFromString(text, "text/xml");
+    if(xmlDoc.getElementsByTagName("parsererror").length){
+      return null;
+    }
+    var map = buildTagMap(xmlDoc);
+
+    var numero = firstOf(map, ["numero","nnfse","numeronfse","nnf"]);
+    var cliente = firstOf(map, ["razaosocial","xnome","nome","tomador"]);
+    var dataEmissao = firstOf(map, ["dataemissao","dhemi","demi"]);
+    var valor = firstOf(map, ["valorservicos","vservicos","vserv","valortotal"]);
+    var issPercentual = firstOf(map, ["aliquota","aliquotaiss","valiq"]);
+    var issRetidoRaw = firstOf(map, ["issretido","iretiss"]);
+    var descricao = firstOf(map, ["discriminacao","xdescricao","descricao","discriminacaoservico"]);
+
+    var retido = false;
+    if(issRetidoRaw){
+      retido = (issRetidoRaw === "1" || issRetidoRaw.toLowerCase() === "sim" || issRetidoRaw.toLowerCase() === "s");
+    }
+
+    return {
+      numero: numero,
+      cliente: cliente,
+      dataEmissao: toDateInputValue(dataEmissao),
+      valor: toNumber(valor),
+      issPercentual: toNumber(issPercentual),
+      issRetido: retido ? "sim" : "nao",
+      descricaoServico: descricao
+    };
+  }
+
+  function fillFormFromFields(f){
+    if(f.numero) numeroField.value = f.numero;
+    if(f.cliente) clienteField.value = f.cliente;
+    if(f.dataEmissao) dataEmissaoField.value = f.dataEmissao;
+    if(f.valor !== "") valorField.value = f.valor;
+    if(f.issPercentual !== "") issPercentualField.value = f.issPercentual;
+    issRetidoField.value = f.issRetido;
+    if(f.descricaoServico) descricaoServicoField.value = f.descricaoServico;
+  }
+
+  xmlInput.addEventListener("change", function(){
+    var files = Array.prototype.slice.call(xmlInput.files || []);
+    if(files.length === 0) return;
+
+    if(files.length === 1){
+      readFileAsText(files[0]).then(function(text){
+        var f = extractFieldsFromXmlText(text);
+        if(!f){
+          xmlStatus.textContent = "Não consegui ler esse XML. Confira o arquivo ou preencha manualmente.";
+          return;
+        }
+        fillFormFromFields(f);
+        xmlStatus.textContent = "Dados importados de \"" + files[0].name + "\". Confira os campos abaixo antes de salvar.";
+        window.scrollTo({top: form.offsetTop - 20, behavior:"smooth"});
+      }).catch(function(){
+        xmlStatus.textContent = "Não consegui extrair os dados desse XML. Preencha manualmente.";
+      });
+      return;
+    }
+
+    xmlStatus.textContent = "Importando " + files.length + " arquivos...";
+
+    var promises = files.map(function(file){
+      return readFileAsText(file).then(function(text){
+        var f = extractFieldsFromXmlText(text);
+        return {file:file, fields:f};
+      }).catch(function(){
+        return {file:file, fields:null};
+      });
+    });
+
+    Promise.all(promises).then(function(results){
+      var okCount = 0;
+      var failCount = 0;
+      results.forEach(function(r){
+        if(!r.fields){ failCount++; return; }
+        notas.unshift({
+          id: uid(),
+          numero: r.fields.numero || "",
+          cliente: r.fields.cliente || "",
+          dataEmissao: r.fields.dataEmissao || todayISO(),
+          dataVencimento: "",
+          valor: r.fields.valor === "" ? 0 : r.fields.valor,
+          issRetido: r.fields.issRetido || "nao",
+          issPercentual: r.fields.issPercentual === "" ? 0 : r.fields.issPercentual,
+          descricaoServico: r.fields.descricaoServico || "",
+          status: "emitida",
+          obs: "Importado de " + r.file.name
+        });
+        okCount++;
+      });
+      saveData();
+      render();
+      xmlStatus.textContent = okCount + " nota(s) importada(s)" + (failCount ? ", " + failCount + " arquivo(s) não reconhecido(s)" : "") + ". Revise os dados na lista abaixo.";
+      window.scrollTo({top: 0, behavior:"smooth"});
+    });
+  });
+
+  function resetForm(){
+    form.reset();
+    editIdField.value = "";
+    dataEmissaoField.value = todayISO();
+    submitBtn.textContent = "Adicionar";
+    formTitle.textContent = "Nova nota fiscal";
+    cancelEditBtn.style.display = "none";
+  }
+
+  function startEdit(id){
+    var n = notas.find(function(x){return x.id === id;});
+    if(!n) return;
+    editIdField.value = n.id;
+    numeroField.value = n.numero;
+    clienteField.value = n.cliente;
+    dataEmissaoField.value = n.dataEmissao;
+    dataVencimentoField.value = n.dataVencimento || "";
+    valorField.value = n.valor;
+    issRetidoField.value = n.issRetido || "nao";
+    issPercentualField.value = n.issPercentual || "";
+    descricaoServicoField.value = n.descricaoServico || "";
+    statusField.value = n.status;
+    obsField.value = n.obs || "";
+    submitBtn.textContent = "Salvar alterações";
+    formTitle.textContent = "Editando nota #" + n.numero;
+    cancelEditBtn.style.display = "inline-block";
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  function deleteNota(id){
+    if(!confirm("Excluir esta nota fiscal?")) return;
+    notas = notas.filter(function(x){return x.id !== id;});
+    saveData();
+    render();
+  }
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var id = editIdField.value;
+    var record = {
+      id: id || uid(),
+      numero: numeroField.value.trim(),
+      cliente: clienteField.value.trim(),
+      dataEmissao: dataEmissaoField.value,
+      dataVencimento: dataVencimentoField.value,
+      valor: parseFloat(valorField.value) || 0,
+      issRetido: issRetidoField.value,
+      issPercentual: parseFloat(issPercentualField.value) || 0,
+      descricaoServico: descricaoServicoField.value.trim(),
+      status: statusField.value,
+      obs: obsField.value.trim()
+    };
+
+    if(id){
+      var idx = notas.findIndex(function(x){return x.id === id;});
+      if(idx !== -1) notas[idx] = record;
+    } else {
+      notas.unshift(record);
+    }
+
+    saveData();
+    resetForm();
+    render();
+  });
+
+  cancelEditBtn.addEventListener("click", resetForm);
+
+  searchBox.addEventListener("input", render);
+  filterStatus.addEventListener("change", render);
+  filterMonth.addEventListener("change", render);
+
+  function getFiltered(){
+    var q = searchBox.value.trim().toLowerCase();
+    var st = filterStatus.value;
+    var mo = filterMonth.value;
+
+    return notas.filter(function(n){
+      if(q){
+        var hay = (n.numero + " " + n.cliente).toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
+      }
+      if(st && n.status !== st) return false;
+      if(mo && n.dataEmissao && n.dataEmissao.slice(0,7) !== mo) return false;
+      return true;
+    });
+  }
+
+  function render(){
+    var list = getFiltered();
+    tbody.innerHTML = "";
+
+    if(list.length === 0){
+      emptyMsg.style.display = "block";
+    } else {
+      emptyMsg.style.display = "none";
+      list.forEach(function(n){
+        var tr = document.createElement("tr");
+
+        var tdNum = document.createElement("td");
+        tdNum.textContent = n.numero;
+        tr.appendChild(tdNum);
+
+        var tdCliente = document.createElement("td");
+        tdCliente.textContent = n.cliente;
+        tr.appendChild(tdCliente);
+
+        var tdServico = document.createElement("td");
+        tdServico.textContent = n.descricaoServico || "-";
+        tdServico.title = n.descricaoServico || "";
+        tr.appendChild(tdServico);
+
+        var tdEmissao = document.createElement("td");
+        tdEmissao.textContent = formatDateDisplay(n.dataEmissao);
+        tr.appendChild(tdEmissao);
+
+        var tdVenc = document.createElement("td");
+        tdVenc.textContent = formatDateDisplay(n.dataVencimento);
+        tr.appendChild(tdVenc);
+
+        var tdValor = document.createElement("td");
+        tdValor.className = "num";
+        tdValor.textContent = formatBRL(n.valor);
+        tr.appendChild(tdValor);
+
+        var tdISS = document.createElement("td");
+        tdISS.className = "num";
+        tdISS.textContent = n.issRetido === "sim" ? formatBRL(calcISSValor(n.valor, n.issPercentual)) : "-";
+        tr.appendChild(tdISS);
+
+        var tdLiquido = document.createElement("td");
+        tdLiquido.className = "num";
+        tdLiquido.textContent = formatBRL(calcLiquido(n));
+        tr.appendChild(tdLiquido);
+
+        var tdStatus = document.createElement("td");
+        var badge = document.createElement("span");
+        badge.className = "badge " + n.status;
+        var labels = {emitida:"Emitida", paga:"Paga", atrasada:"Atrasada", cancelada:"Cancelada"};
+        badge.textContent = labels[n.status] || n.status;
+        tdStatus.appendChild(badge);
+        tr.appendChild(tdStatus);
+
+        var tdActions = document.createElement("td");
+        tdActions.className = "actions";
+        var editBtn = document.createElement("button");
+        editBtn.className = "ghost";
+        editBtn.textContent = "Editar";
+        editBtn.addEventListener("click", function(){ startEdit(n.id); });
+        var delBtn = document.createElement("button");
+        delBtn.className = "ghost";
+        delBtn.textContent = "Excluir";
+        delBtn.addEventListener("click", function(){ deleteNota(n.id); });
+        tdActions.appendChild(editBtn);
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    var sumList = list.reduce(function(acc, n){ return acc + (n.status !== "cancelada" ? n.valor : 0); }, 0);
+    var sumLiquido = list.reduce(function(acc, n){ return acc + (n.status !== "cancelada" ? calcLiquido(n) : 0); }, 0);
+    filteredSummary.textContent = list.length + " nota(s) filtrada(s) — bruto " + formatBRL(sumList) + " · líquido " + formatBRL(sumLiquido);
+
+    renderStats();
+  }
+
+  function renderStats(){
+    var mk = currentMonthKey();
+    var mesNotas = notas.filter(function(n){ return n.dataEmissao && n.dataEmissao.slice(0,7) === mk && n.status !== "cancelada"; });
+    var mesTotal = mesNotas.reduce(function(acc,n){ return acc + n.valor; }, 0);
+    var mesPago = mesNotas.filter(function(n){ return n.status === "paga"; }).reduce(function(acc,n){ return acc + n.valor; }, 0);
+    var aberto = notas.filter(function(n){ return n.status === "emitida" || n.status === "atrasada"; }).reduce(function(acc,n){ return acc + n.valor; }, 0);
+
+    statMesTotal.textContent = formatBRL(mesTotal);
+    statMesPago.textContent = formatBRL(mesPago);
+    statAberto.textContent = formatBRL(aberto);
+    statCount.textContent = notas.length;
+  }
+
+  function exportCSV(){
+    if(notas.length === 0){
+      alert("Nenhuma nota para exportar.");
+      return;
+    }
+    var header = ["Numero","Cliente","DescricaoServico","DataEmissao","DataVencimento","ValorBruto","ISSRetido","ISSPercentual","ValorLiquido","Status","Observacoes"];
+    var rows = notas.map(function(n){
+      return [
+        n.numero,
+        n.cliente,
+        (n.descricaoServico || "").replace(/,/g,";"),
+        n.dataEmissao,
+        n.dataVencimento || "",
+        n.valor,
+        n.issRetido === "sim" ? "sim" : "nao",
+        n.issPercentual || 0,
+        calcLiquido(n).toFixed(2),
+        n.status,
+        (n.obs || "").replace(/,/g,";")
+      ];
+    });
+    var csv = [header.join(",")].concat(rows.map(function(r){ return r.join(","); })).join("\n");
+    var blob = new Blob(["﻿" + csv], {type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "notas_fiscais_" + todayISO() + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  exportBtn.addEventListener("click", exportCSV);
+
+  clearBtn.addEventListener("click", function(){
+    if(notas.length === 0) return;
+    if(!confirm("Isso vai apagar TODAS as notas cadastradas. Tem certeza?")) return;
+    notas = [];
+    saveData();
+    render();
+  });
+
+  loadData();
+  render();
+})();
+</script>
+</body>
+</html>
