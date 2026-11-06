@@ -401,6 +401,15 @@
     return map;
   }
 
+  function findFirstByLocalName(root, names){
+    var all = root.getElementsByTagName("*");
+    for(var i=0;i<all.length;i++){
+      var name = (all[i].localName || all[i].tagName || "").toLowerCase();
+      if(names.indexOf(name) !== -1) return all[i];
+    }
+    return null;
+  }
+
   function firstOf(map, candidates){
     for(var i=0;i<candidates.length;i++){
       var v = map[candidates[i].toLowerCase()];
@@ -441,13 +450,25 @@
     }
     var map = buildTagMap(xmlDoc);
 
-    var numero = firstOf(map, ["numero","nnfse","numeronfse","nnf"]);
-    var cliente = firstOf(map, ["razaosocial","xnome","nome","tomador"]);
+    var numero = firstOf(map, ["numero","nnfse","numeronfse","nnf","ndfse"]);
+
+    // O nome do cliente tem que vir de dentro do bloco "Tomador" (quem recebe a nota),
+    // nunca do bloco "Prestador" (quem presta o serviço) — senão pega o nome errado.
+    var tomadorEl = findFirstByLocalName(xmlDoc, ["tomador","tomadorservico","destinatario","toma"]);
+    var cliente = "";
+    if(tomadorEl){
+      var tomadorMap = buildTagMap(tomadorEl);
+      cliente = firstOf(tomadorMap, ["razaosocial","xnome","nome"]);
+    }
+    if(!cliente){
+      cliente = firstOf(map, ["razaosocial","xnome","nome","tomador"]);
+    }
+
     var dataEmissao = firstOf(map, ["dataemissao","dhemi","demi"]);
     var valor = firstOf(map, ["valorservicos","vservicos","vserv","valortotal"]);
     var issPercentual = firstOf(map, ["aliquota","aliquotaiss","valiq"]);
     var issRetidoRaw = firstOf(map, ["issretido","iretiss"]);
-    var descricao = firstOf(map, ["discriminacao","xdescricao","descricao","discriminacaoservico"]);
+    var descricao = firstOf(map, ["discriminacao","xdescricao","descricao","discriminacaoservico","xdescserv","xtribnac"]);
 
     var retido = false;
     if(issRetidoRaw){
@@ -766,6 +787,10 @@
   }, function(err){
     xmlStatus.textContent = "Erro ao conectar com o banco de dados: " + err.message;
   });
+
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  }
 })();
 </script>
 </body>
