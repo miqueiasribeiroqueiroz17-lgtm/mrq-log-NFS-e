@@ -153,13 +153,22 @@
     </div>
   </div>
 
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+    <label style="font-size:13px;color:var(--muted);">Ano:</label>
+    <select id="statsYear"></select>
+  </div>
+
   <div class="cards">
+    <div class="card">
+      <div class="label">Recebido total (geral)</div>
+      <div class="value" id="statRecebidoGeral" style="color:var(--accent);">R$ 0,00</div>
+    </div>
     <div class="card blue">
-      <div class="label">Total emitido (mês atual)</div>
+      <div class="label">Total emitido (no ano)</div>
       <div class="value" id="statMesTotal">R$ 0,00</div>
     </div>
     <div class="card green">
-      <div class="label">Recebido (mês atual)</div>
+      <div class="label">Recebido (no ano)</div>
       <div class="value" id="statMesPago">R$ 0,00</div>
     </div>
     <div class="card orange">
@@ -170,6 +179,17 @@
       <div class="label">Notas cadastradas</div>
       <div class="value" id="statCount">0</div>
     </div>
+  </div>
+
+  <div class="panel">
+    <h2>Evolução da receita</h2>
+    <div class="toolbar">
+      <select id="chartMode">
+        <option value="mensal">Mensal (últimos 12 meses)</option>
+        <option value="anual">Anual</option>
+      </select>
+    </div>
+    <canvas id="revenueChart" style="width:100%;height:220px;display:block;"></canvas>
   </div>
 
   <div class="panel">
@@ -234,6 +254,14 @@
         <label>Observações</label>
         <input type="text" id="obs" placeholder="opcional" />
       </div>
+      <div class="field" style="grid-column:1 / -1;">
+        <label>Anexar comprovante (XML ou PDF) — opcional</label>
+        <input type="file" id="anexoInput" accept=".xml,.pdf,text/xml,application/pdf" />
+        <div class="sub" id="anexoInfo" style="margin-top:4px;"></div>
+      </div>
+      <div class="field">
+        <button type="button" class="secondary" id="removeAnexoBtn" style="display:none;">Remover anexo</button>
+      </div>
       <div class="field">
         <button type="submit" id="submitBtn">Adicionar</button>
       </div>
@@ -276,6 +304,10 @@
         <tbody id="tbody"></tbody>
       </table>
       <div class="empty" id="emptyMsg" style="display:none;">Nenhuma nota cadastrada ainda.</div>
+    </div>
+
+    <div style="text-align:center;margin-top:14px;">
+      <button type="button" class="secondary" id="loadMoreBtn" style="display:none;">Carregar mais</button>
     </div>
 
     <div class="footer-actions">
@@ -370,9 +402,22 @@
   var statMesPago = document.getElementById("statMesPago");
   var statAberto = document.getElementById("statAberto");
   var statCount = document.getElementById("statCount");
+  var statRecebidoGeral = document.getElementById("statRecebidoGeral");
+  var statsYear = document.getElementById("statsYear");
+  statsYear.addEventListener("change", renderStats);
 
   var exportBtn = document.getElementById("exportBtn");
   var clearBtn = document.getElementById("clearBtn");
+  var loadMoreBtn = document.getElementById("loadMoreBtn");
+  var chartModeSelect = document.getElementById("chartMode");
+  var anexoInput = document.getElementById("anexoInput");
+  var anexoInfo = document.getElementById("anexoInfo");
+  var removeAnexoBtn = document.getElementById("removeAnexoBtn");
+
+  var PAGE_SIZE = 25;
+  var visibleCount = PAGE_SIZE;
+  var pendingAnexo = null;
+  var currentEditingAnexo = null;
 
   dataEmissaoField.value = todayISO();
 
@@ -432,6 +477,55 @@
     var n = parseFloat(String(raw).replace(",", "."));
     return isNaN(n) ? "" : n;
   }
+
+  function textToBase64(str){
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+
+  function base64ToBlob(base64, mime){
+    var byteChars = atob(base64);
+    var byteNumbers = new Array(byteChars.length);
+    for(var i=0;i<byteChars.length;i++){ byteNumbers[i] = byteChars.charCodeAt(i); }
+    var byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], {type: mime || "application/octet-stream"});
+  }
+
+  function viewAnexo(anexo){
+    if(!anexo || !anexo.dados) return;
+    var blob = base64ToBlob(anexo.dados, anexo.tipo);
+    var url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+  }
+
+  anexoInput.addEventListener("change", function(){
+    var file = anexoInput.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var dataUrl = e.target.result;
+      var comma = dataUrl.indexOf(",");
+      var base64 = dataUrl.slice(comma + 1);
+      if(base64.length > 700000){
+        anexoInfo.textContent = "Arquivo muito grande (~" + Math.round(file.size/1024) + " KB). Tente um menor que 500 KB.";
+        anexoInput.value = "";
+        pendingAnexo = null;
+        return;
+      }
+      pendingAnexo = { nome: file.name, tipo: file.type || "application/octet-stream", dados: base64 };
+      anexoInfo.textContent = "Anexado: " + file.name + " (" + Math.round(file.size/1024) + " KB)";
+      removeAnexoBtn.style.display = "none";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  removeAnexoBtn.addEventListener("click", function(){
+    currentEditingAnexo = null;
+    pendingAnexo = null;
+    anexoInput.value = "";
+    anexoInfo.textContent = "Anexo removido (será salvo sem anexo).";
+    removeAnexoBtn.style.display = "none";
+  });
 
   function readFileAsText(file){
     return new Promise(function(resolve, reject){
@@ -508,6 +602,8 @@
           return;
         }
         fillFormFromFields(f);
+        pendingAnexo = { nome: files[0].name, tipo: "text/xml", dados: textToBase64(text) };
+        anexoInfo.textContent = "Anexado automaticamente: " + files[0].name;
         xmlStatus.textContent = "Dados importados de \"" + files[0].name + "\". Confira os campos abaixo antes de salvar.";
         window.scrollTo({top: form.offsetTop - 20, behavior:"smooth"});
       }).catch(function(){
@@ -521,9 +617,9 @@
     var promises = files.map(function(file){
       return readFileAsText(file).then(function(text){
         var f = extractFieldsFromXmlText(text);
-        return {file:file, fields:f};
+        return {file:file, fields:f, text:text};
       }).catch(function(){
-        return {file:file, fields:null};
+        return {file:file, fields:null, text:""};
       });
     });
 
@@ -544,7 +640,8 @@
           issPercentual: r.fields.issPercentual === "" ? 0 : r.fields.issPercentual,
           descricaoServico: r.fields.descricaoServico || "",
           status: "emitida",
-          obs: "Importado de " + r.file.name
+          obs: "Importado de " + r.file.name,
+          anexo: { nome: r.file.name, tipo: "text/xml", dados: textToBase64(r.text) }
         };
         batch.set(notasRef.doc(record.id), record);
         okCount++;
@@ -565,6 +662,11 @@
     submitBtn.textContent = "Adicionar";
     formTitle.textContent = "Nova nota fiscal";
     cancelEditBtn.style.display = "none";
+    pendingAnexo = null;
+    currentEditingAnexo = null;
+    anexoInput.value = "";
+    anexoInfo.textContent = "";
+    removeAnexoBtn.style.display = "none";
   }
 
   function startEdit(id){
@@ -584,6 +686,18 @@
     submitBtn.textContent = "Salvar alterações";
     formTitle.textContent = "Editando nota #" + n.numero;
     cancelEditBtn.style.display = "inline-block";
+
+    pendingAnexo = null;
+    anexoInput.value = "";
+    currentEditingAnexo = n.anexo || null;
+    if(currentEditingAnexo){
+      anexoInfo.textContent = "Anexo atual: " + currentEditingAnexo.nome + " (selecione outro arquivo acima pra substituir)";
+      removeAnexoBtn.style.display = "inline-block";
+    } else {
+      anexoInfo.textContent = "";
+      removeAnexoBtn.style.display = "none";
+    }
+
     window.scrollTo({top:0, behavior:"smooth"});
   }
 
@@ -611,6 +725,9 @@
       obs: obsField.value.trim()
     };
 
+    var anexoParaSalvar = pendingAnexo || currentEditingAnexo;
+    if(anexoParaSalvar) record.anexo = anexoParaSalvar;
+
     notasRef.doc(record.id).set(record).then(function(){
       resetForm();
     }).catch(function(err){
@@ -620,9 +737,19 @@
 
   cancelEditBtn.addEventListener("click", resetForm);
 
-  searchBox.addEventListener("input", render);
-  filterStatus.addEventListener("change", render);
-  filterMonth.addEventListener("change", render);
+  function resetPagingAndRender(){
+    visibleCount = PAGE_SIZE;
+    render();
+  }
+
+  searchBox.addEventListener("input", resetPagingAndRender);
+  filterStatus.addEventListener("change", resetPagingAndRender);
+  filterMonth.addEventListener("change", resetPagingAndRender);
+
+  loadMoreBtn.addEventListener("click", function(){
+    visibleCount += PAGE_SIZE;
+    render();
+  });
 
   function getFiltered(){
     var q = searchBox.value.trim().toLowerCase();
@@ -642,13 +769,14 @@
 
   function render(){
     var list = getFiltered();
+    var pageList = list.slice(0, visibleCount);
     tbody.innerHTML = "";
 
     if(list.length === 0){
       emptyMsg.style.display = "block";
     } else {
       emptyMsg.style.display = "none";
-      list.forEach(function(n){
+      pageList.forEach(function(n){
         var tr = document.createElement("tr");
 
         var tdNum = document.createElement("td");
@@ -707,10 +835,27 @@
         delBtn.addEventListener("click", function(){ deleteNota(n.id); });
         tdActions.appendChild(editBtn);
         tdActions.appendChild(delBtn);
+
+        if(n.anexo && n.anexo.dados){
+          var anexoBtn = document.createElement("button");
+          anexoBtn.className = "ghost";
+          anexoBtn.textContent = "Anexo";
+          anexoBtn.title = n.anexo.nome || "";
+          anexoBtn.addEventListener("click", function(){ viewAnexo(n.anexo); });
+          tdActions.appendChild(anexoBtn);
+        }
+
         tr.appendChild(tdActions);
 
         tbody.appendChild(tr);
       });
+    }
+
+    if(list.length > visibleCount){
+      loadMoreBtn.style.display = "inline-block";
+      loadMoreBtn.textContent = "Carregar mais (" + (list.length - visibleCount) + " restantes)";
+    } else {
+      loadMoreBtn.style.display = "none";
     }
 
     var sumList = list.reduce(function(acc, n){ return acc + (n.status !== "cancelada" ? n.valor : 0); }, 0);
@@ -718,19 +863,155 @@
     filteredSummary.textContent = list.length + " nota(s) filtrada(s) — bruto " + formatBRL(sumList) + " · líquido " + formatBRL(sumLiquido);
 
     renderStats();
+    renderChart();
+  }
+
+  function populateYearSelect(){
+    var years = {};
+    notas.forEach(function(n){
+      if(n.dataEmissao && n.dataEmissao.length >= 4){
+        years[n.dataEmissao.slice(0,4)] = true;
+      }
+    });
+    var yearList = Object.keys(years).sort().reverse();
+    var currentYear = String(new Date().getFullYear());
+    if(yearList.indexOf(currentYear) === -1) yearList.unshift(currentYear);
+
+    var previousValue = statsYear.value;
+    statsYear.innerHTML = "";
+    var optAll = document.createElement("option");
+    optAll.value = "";
+    optAll.textContent = "Todos os anos";
+    statsYear.appendChild(optAll);
+    yearList.forEach(function(y){
+      var opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      statsYear.appendChild(opt);
+    });
+
+    if(previousValue && (previousValue === "" || yearList.indexOf(previousValue) !== -1)){
+      statsYear.value = previousValue;
+    } else {
+      statsYear.value = currentYear;
+    }
   }
 
   function renderStats(){
-    var mk = currentMonthKey();
-    var mesNotas = notas.filter(function(n){ return n.dataEmissao && n.dataEmissao.slice(0,7) === mk && n.status !== "cancelada"; });
-    var mesTotal = mesNotas.reduce(function(acc,n){ return acc + n.valor; }, 0);
-    var mesPago = mesNotas.filter(function(n){ return n.status === "paga"; }).reduce(function(acc,n){ return acc + n.valor; }, 0);
+    populateYearSelect();
+    var selectedYear = statsYear.value;
+
+    var recebidoGeral = notas.filter(function(n){ return n.status === "paga"; }).reduce(function(acc,n){ return acc + n.valor; }, 0);
+
+    var notasDoAno = selectedYear
+      ? notas.filter(function(n){ return n.dataEmissao && n.dataEmissao.slice(0,4) === selectedYear && n.status !== "cancelada"; })
+      : notas.filter(function(n){ return n.status !== "cancelada"; });
+
+    var anoTotal = notasDoAno.reduce(function(acc,n){ return acc + n.valor; }, 0);
+    var anoPago = notasDoAno.filter(function(n){ return n.status === "paga"; }).reduce(function(acc,n){ return acc + n.valor; }, 0);
     var aberto = notas.filter(function(n){ return n.status === "emitida" || n.status === "atrasada"; }).reduce(function(acc,n){ return acc + n.valor; }, 0);
 
-    statMesTotal.textContent = formatBRL(mesTotal);
-    statMesPago.textContent = formatBRL(mesPago);
+    statRecebidoGeral.textContent = formatBRL(recebidoGeral);
+    statMesTotal.textContent = formatBRL(anoTotal);
+    statMesPago.textContent = formatBRL(anoPago);
     statAberto.textContent = formatBRL(aberto);
     statCount.textContent = notas.length;
+  }
+
+  function formatCompactBRL(v){
+    if(v >= 1000) return "R$" + (v/1000).toFixed(1).replace(".0","") + "k";
+    return "R$" + Math.round(v);
+  }
+
+  chartModeSelect.addEventListener("change", renderChart);
+  window.addEventListener("resize", function(){ renderChart(); });
+
+  function renderChart(){
+    var canvas = document.getElementById("revenueChart");
+    if(!canvas) return;
+    var mode = chartModeSelect.value;
+    var buckets = {};
+
+    notas.forEach(function(n){
+      if(n.status === "cancelada" || !n.dataEmissao) return;
+      var key = mode === "anual" ? n.dataEmissao.slice(0,4) : n.dataEmissao.slice(0,7);
+      if(!buckets[key]) buckets[key] = {emitido:0, pago:0};
+      buckets[key].emitido += n.valor;
+      if(n.status === "paga") buckets[key].pago += n.valor;
+    });
+
+    var keys = Object.keys(buckets).sort();
+    if(mode !== "anual" && keys.length > 12) keys = keys.slice(keys.length - 12);
+
+    var cssWidth = canvas.clientWidth || 600;
+    var cssHeight = 220;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = cssWidth * dpr;
+    canvas.height = cssHeight * dpr;
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    if(keys.length === 0){
+      ctx.fillStyle = "#9fb0cc";
+      ctx.font = "13px sans-serif";
+      ctx.fillText("Sem dados suficientes ainda.", 10, cssHeight/2);
+      return;
+    }
+
+    var maxVal = 0;
+    keys.forEach(function(k){ maxVal = Math.max(maxVal, buckets[k].emitido, buckets[k].pago); });
+    if(maxVal === 0) maxVal = 1;
+
+    var paddingLeft = 46, paddingBottom = 26, paddingTop = 20, paddingRight = 10;
+    var chartW = cssWidth - paddingLeft - paddingRight;
+    var chartH = cssHeight - paddingTop - paddingBottom;
+    var groupWidth = chartW / keys.length;
+    var barWidth = Math.max(3, Math.min(18, groupWidth/3));
+
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.fillStyle = "#9fb0cc";
+    ctx.font = "10px sans-serif";
+    var steps = 4;
+    for(var s=0;s<=steps;s++){
+      var y = paddingTop + chartH - (chartH*s/steps);
+      ctx.beginPath();
+      ctx.moveTo(paddingLeft, y);
+      ctx.lineTo(paddingLeft+chartW, y);
+      ctx.stroke();
+      ctx.fillText(formatCompactBRL(maxVal*s/steps), 2, y+3);
+    }
+
+    keys.forEach(function(k, i){
+      var cx = paddingLeft + i*groupWidth + groupWidth/2;
+      var emit = buckets[k].emitido;
+      var pago = buckets[k].pago;
+      var hEmit = (emit/maxVal)*chartH;
+      var hPago = (pago/maxVal)*chartH;
+
+      ctx.fillStyle = "#f7941e";
+      ctx.fillRect(cx - barWidth - 2, paddingTop+chartH-hEmit, barWidth, hEmit);
+
+      ctx.fillStyle = "#22c55e";
+      ctx.fillRect(cx + 2, paddingTop+chartH-hPago, barWidth, hPago);
+
+      ctx.fillStyle = "#9fb0cc";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      var label = mode === "anual" ? k : k.slice(2).replace("-", "/");
+      ctx.fillText(label, cx, cssHeight-8);
+      ctx.textAlign = "left";
+    });
+
+    ctx.fillStyle = "#f7941e";
+    ctx.fillRect(cssWidth-150, 2, 10, 10);
+    ctx.fillStyle = "#9fb0cc";
+    ctx.font = "11px sans-serif";
+    ctx.fillText("Emitido", cssWidth-135, 11);
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(cssWidth-65, 2, 10, 10);
+    ctx.fillStyle = "#9fb0cc";
+    ctx.fillText("Pago", cssWidth-50, 11);
   }
 
   function exportCSV(){
